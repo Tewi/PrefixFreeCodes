@@ -5,33 +5,23 @@ from collections import namedtuple
 Interval = namedtuple('Interval','left right')
 
 class ExternalNode:
-    """Given a partially sorted array W, and a position in it, create the corresponding External node.
+"""
+Given a partially sorted array W, and a position in it, create the corresponding External node.
 The weight is computed only at request by performing a select query in the partiallySortedArray.
-
->>> W = PartiallySortedArray([150,140,130,120,110,32,16,10,10,10,10])
->>> x = ExternalNode(W,0)
->>> y = ExternalNode(W,0)
->>> z = ExternalNode(W,1)
->>> print(x == y)
-True
->>> print(x == z)
-False
->>> print(str(x))
-[select(0)]
 """
     def __init__(self, partiallySortedArray, position):
         self.partiallySortedArray = partiallySortedArray
         self.position = position
-        self.left = None
-        self.right = None
+        self.children = None
         self.interval = Interval(position,position+1)
         self.CachedValueOfWeight = None
     def weight(self):
         if self.CachedValueOfWeight == None:
-            self.CachedValueOfWeight = self.partiallySortedArray.select(self.interval[0])
+            self.CachedValueOfWeight = self.partiallySortedArray.select(self.position)
         return self.CachedValueOfWeight
     def depths(self, depth=0):
-        """Given a code tree, return the (unsorted) list of the depths of its leaves.
+        """
+        Given a code tree, return the (unsorted) list of the depths of its leaves.
         """
         return [depth]
     def __cmp__(self,other):
@@ -50,104 +40,81 @@ False
 
 
 class InternalNode:
-
-    """Given a partially sorted array W and two pointers, builds a node of the codeTree for the GDM algorithm.  The weight is computed only at request.
-
->>> W = PartiallySortedArray([100,100,50,10,10])
->>> x = ExternalNode(W,0)
->>> y = ExternalNode(W,1)
->>> z = InternalNode(W,x,y)
->>> print(W.totalNbOfQueriesPerformed())
-0
->>> print(x.weight())
-10
->>> print(y.weight())
-10
->>> print(z.weight())
-20
->>> x2 = ExternalNode(W,3)
->>> y2 = ExternalNode(W,4)
->>> z2 = InternalNode(W,x2,y2)
->>> print(z2.weight())
-200
->>> z3 = InternalNode(W,z,z2)
->>> print(z3.weight())
-220
->>> print(z3.depths())
-[2, 2, 2, 2]
-
 """
-    def __init__(self, partiallySortedArray, children):#left, right):
+Given a partially sorted array W and two pointers, builds a node of the codeTree
+for the GDM algorithm.  The weight is computed only at request.
+"""
+    def __init__(self, partiallySortedArray, children):
         self.partiallySortedArray = partiallySortedArray
         self.position = None
-        # self.left = left
-        # self.right = right
-        self.children = children #Internal/External nodes
-        # if left.CachedValueOfWeight == None or right.CachedValueOfWeight == None:
-        #     self.CachedValueOfWeight = None
-        # else:
-        #     self.CachedValueOfWeight = left.CachedValueOfWeight + right.CachedValueOfWeight
+        self.children = children
         self.CachedValueOfWeight = 0
-        for child in self.children:
-            if(child.CachedValueOfWeight == None):
-                self.CachedValueOfWeight = None
-                break
-            else:
-                self.CachedValueOfWeight += child.CachedValueOfWeight
-
-        if(left.interval != None and right.interval != None and left.interval.right == right.interval.left):
-            self.interval = Interval(left.interval.left,right.interval.right)
+        if None in [child.CachedValueOfWeight for child in children]:
+            self.CachedValueOfWeight = None
         else:
-            self.interval = None
-            self.CachedValueOfWeight = left.weight() + right.weight() # Mixed nodes are systematically computed.
+            self.CachedValueOfWeight = sum([child.CachedValueOfWeight for child in self.children])
 
+        #If children are contiguos weights
+        if False not in [left.interval != None and right.interval != None and left.interval.right == right.interval.left for left, right in zip(self.children, self.children[1:])]:
+            self.interval = Interval(children[0].interval.left, children[-1].interval.right)
+        else: # Mixed nodes are systematically computed.
+            self.interval = None
+            #TODO calculate weights of consecutive intervals with partialSums
+            self.CachedValueOfWeight = sum([child.weight() for child in self.children])
     def weight(self):
         if self.CachedValueOfWeight == None:
             if self.interval != None:
                 self.CachedValueOfWeight = self.partiallySortedArray.rangeSum(self.interval.left,self.interval.right)
             else:
-                self.CachedValueOfWeight = self.left.weight() + self.right.weight()
+                self.CachedValueOfWeight = sum([child.weight() for child in self.children])
         return self.CachedValueOfWeight
 
     def depths(self, depth=0):
-        """Given a code tree, return the (unsorted) list of the depths of its leaves.
-"""
-        depthsOnLeft =  self.left.depths(depth+1)
-        depthsOnRight = self.right.depths(depth+1)
-        return depthsOnLeft+depthsOnRight
+        """
+        Given a code tree, return the (unsorted) list of the depths of its leaves.
+        """
+        childrenDephts = []
+        for child in self.children:
+            childrenDephts +=child.depths(depth+1)
+        return childrenDepths
 
     def __cmp__(self,other):
-        """Given two code trees, compare them exactly.
-"""
-        return self.partiallySortedArray == other.partiallySortedArray and self.interval == other.interval and self.left == other.left and self.right == other.right and self.CachedValueOfWeight == other.CachedValueOfWeight
+        """
+        Given two code trees, compare them exactly.
+        """
+        return self.partiallySortedArray == other.partiallySortedArray
+                and self.interval == other.interval
+                and self.CachedValueOfWeight == other.CachedValueOfWeight
+                and False not in [a==b for a,b in zip_longest(self.children, other.children)]
 
     def __eq__(self,other):
-        """Given two code trees, compare them without restrictions on the order of the children.
-"""
-        return self.partiallySortedArray == other.partiallySortedArray and self.CachedValueOfWeight==other.CachedValueOfWeight and (
-            (self.left.__eq__(other.left) and self.right.__eq__(other.right)) or
-            (self.left.__eq__(other.right) and self.right.__eq__(other.left)))
+        """
+        Given two code trees, compare them without restrictions on the order of the children.
+        """
+        return self.partiallySortedArray == other.partiallySortedArray
+                and self.CachedValueOfWeight==other.CachedValueOfWeight
+                and set(self.children) & set(other.children)
 
     def __str__(self):
+        childrenString = '[' + ','.join([str(c) for c in self.children]) + ']'
         if self.CachedValueOfWeight == None and self.interval != None:
-            string = "(rangeSum("+str(self.interval.left)+","+str(self.interval.right)+"),"+str(self.left)+","+str(self.right)+")"
+            string = "(rangeSum("+str(self.interval.left)+","+str(self.interval.right)+"),"+childrenString+")"
         elif self.CachedValueOfWeight == None and self.interval == None:
-            string = "(MixedNonComputedYet,"+str(self.left)+","+str(self.right)+")"
+            string = "(MixedNonComputedYet,"+childrenString+")"
         else:
-            string = "("+str(self.CachedValueOfWeight)+","+str(self.left)+","+str(self.right)+")"
+            string = "("+str(self.CachedValueOfWeight)+","+childrenString+")"
         return string
 
     def toStringWithAllWeightsCalculated(self):
-        """Given a node, convert the corresponding code tree to a string with all the weights calculated, children ordered so that the smallest one comes first.
+        """
+        Given a node, convert the corresponding code tree to a string with all the weights calculated, children ordered so that the smallest one comes first.
         """
         string = "("+str(self.weight())+","
-        if self.left.weight() <= self.right.weight():
-            string += self.left.toStringWithAllWeightsCalculated()+","+self.right.toStringWithAllWeightsCalculated()+")"
-        else:
-            string += self.right.toStringWithAllWeightsCalculated()+","+self.left.toStringWithAllWeightsCalculated()+")"
-        return string
+        for child in sorted(self.children, key=lambda x : x.weight()):
+            string += child.toStringWithAllWeightsCalculated() + ','        
+        return string[:-1] + ')'
 
-
+#TODO update to D-ary
 def nodeListToString(nodes):
     """Given a list of nodes, returns a string listing the trees in the list.
 
