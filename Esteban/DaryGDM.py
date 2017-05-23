@@ -1,3 +1,4 @@
+from partiallySortedArrayWithPartialSumPrecomputed import PartiallySortedArray
 
 """
 Given a list of weights, return an array with the code lengths of
@@ -12,8 +13,8 @@ def GDM(weights, D=2):
         return []
     if N == 1:
         return [0]
-    codeTree = gdmCodeTree(weights, D)
-    codeLengths = codeTree.depths()
+    codeTree = DaryGDMCodeTree(weights, D)
+    codeLengths = codeTree.root.depths()
     return codeLengths
 
 
@@ -24,13 +25,13 @@ minimal redundancy according to the GDM algorithm.
 class DaryGDMCodeTree:
     def __init__(self, weights, D):
 
-        initialize(weights, D)
+        self.initialize(weights, D)
         while(len(self.externals) > 0):
-            groupExternals()
-            dockInternals()
-            mixInternalWithExternal()
-        warpUp()
-        self.root(self.internals[0])
+            self.groupExternals()
+            self.dockInternals()
+            self.mixInternalWithExternal()
+        self.wrapUp()
+        self.root = self.internals[0]
 
     """
     Given an array, partially sort the array and initialize the list of
@@ -40,8 +41,8 @@ class DaryGDMCodeTree:
     def initialize(self, weights, D):
         self.weights = PartiallySortedArray(weights)
         self.D = D
-        self.N = len(frequencies)
-        n0 = (N - 2) % (D-1) + 2 # 2 <= n0 <= D
+        self.N = len(weights)
+        n0 = (self.N - 2) % (self.D-1) + 2 # 2 <= n0 <= D
         self.externals = [ExternalNode(self.weights,i) for i in range(n0,len(self.weights))] # N - n0 external nodes
         self.internals = [InternalNode(self.weights, [ExternalNode(self.weights,i) for i in range(0, n0)])] #internal with n0 external nodes
 
@@ -52,19 +53,39 @@ class DaryGDMCodeTree:
     """
     def groupExternals(self):
         # EE...E
-        r = self.weights.rankRight(internals[0].weight())
+        r = self.weights.rankRight(self.internals[0].weight())
         nbNodes = r-len(self.weights)+len(self.externals)
-        nbLists = nbNodes/self.D
+        nbLists = nbNodes//self.D
         for i in range(0, nbLists):
-            self.internals.append(InternalNode(self.weights, self.externals[:D])
-            self.externals = self.externals[D:]
-        # E..EI..I
-        if numNodes % self.D > 0: #TODO fix EEIIEE
-            #TODO creo que la idea es eliminar todos los EE's menores al interno
-            nbExternalsLeft = numNodes % self.D
-            self.internals.append(InternalNode(self.weights, self.externals[:nbExternalsLeft] + self.internals[:(D - nbExternalsLeft) ]))
-            self.externals = self.externals[numNodes % D:]
-            self.internals = self.internals[(D - nbExternalsLeft):]
+            self.internals.append(InternalNode(self.weights, self.externals[:self.D]))
+            self.externals = self.externals[self.D:]
+        # E..EI[EI]*
+        if nbNodes % self.D > 0:
+            #We pad the node with the E/I's (costly)
+            nodes = self.externals[:nbNodes % self.D] + self.internals[:1]
+            self.externals = self.externals[nbNodes % self.D:]
+            self.internals = self.internals[1:]
+            #Fill the rest of the node with the next minimun weights
+            while len(nodes) < self.D:
+                if self.externals and self.internals:
+                    #We have to chose the lighter between E and I
+                    if self.externals[0].weight() <= self.internals[0].weight():
+                        #Next external is lighter
+                        nodes.append(self.externals[0])
+                        self.externals = self.externals[1:]
+                    else:
+                        #Next interal is lighter
+                        nodes.append(self.internals[0])
+                        self.internals = self.internals[1:]
+                elif not self.internals:
+                    #Only E remain
+                    nodes.append(self.externals[0])
+                    self.externals = self.externals[1:]
+                else:
+                    #Only I remain
+                    nodes.append(self.internals[0])
+                    self.internals = self.internals[1:]
+            self.internals.append(InternalNode(self.weights, nodes))
 
     """
     Given a partially sorted array of frequencies and the number of frequencies
@@ -73,31 +94,58 @@ class DaryGDMCodeTree:
     group the internal nodes by D until at least one internal node has weight
     larger than maxWeight; and return the resulting set of nodes.
     """
-    #Crea nodos internos hasta el siguiente nivel IIIII...III
-    def DockInternals(self):
-        while len(self.externals)>0 and len(self.internals)>= self.D and self.internals[-1].weight() <= externals[0].weight():
-        nbPairsToForm = len(internals) // self.D
-        for i in range(nbPairsToForm):
-            self.internals.append(InternalNode(self.weights,self.internals[:D]))
-            self.internals = self.internals[D:]
+    #I...I
+    def dockInternals(self):
+        while self.externals and len(self.internals)>= self.D and self.internals[-1].weight() <= self.externals[0].weight():
+            nbPairsToForm = len(self.internals) // self.D
+            for i in range(nbPairsToForm):
+                self.internals.append(InternalNode(self.weights,self.internals[:self.D]))
+                self.internals = self.internals[self.D:]
 
     """ """
-    def MixInternalWithExternal(self):
-
-        if len(self.externals)==1:
-            if len(self.internals)==(self.D-1):
-                self.internals = [InternalNode(self.weights, self.internals + self.externals)]
-                self.externals = []
+    def mixInternalWithExternal(self):
+        if not self.externals:
+            return
+        # [EI]*E
+        #We pad the node with the E/I's (costly)
+        nodes = []
+        #Fill the rest of the node with the next minimun weights
+        while len(nodes) < self.D:
+            if self.externals and self.internals:
+                #We have to chose the lighter between E and I
+                if self.externals[0].weight() <= self.internals[0].weight():
+                    #Next external is lighter
+                    nodes.append(self.externals[0])
+                    self.externals = self.externals[1:]
+                else:
+                    #Next interal is lighter
+                    nodes.append(self.internals[0])
+                    self.internals = self.internals[1:]
+            elif not self.internals:
+                #Only E remain
+                nodes.append(self.externals[0])
+                self.externals = self.externals[1:]
             else:
-                
+                #Only I remain
+                nodes.append(self.internals[0])
+                self.internals = self.internals[1:]
+        self.internals.append(InternalNode(self.weights, nodes))
 
 
-        return 0
-
+    """
+    Given a list of internal nodes (when there is no external nodes left),
+    combine the nodes of the list until only one is left.
+    """
     def wrapUp(self):
-        return 0
+        #Ther should be N inner nodes left, were (N-1)/(D-1) is an integer
+        while len(self.internals) > 1:
+            self.internals.append(InternalNode(self.weights, self.internals[:self.D]))
+            self.internals = self.internals[self.D:]
+        self.internals[0].weight()
 
 
+
+from collections import namedtuple
 
 Interval = namedtuple('Interval','left right')
 
@@ -136,23 +184,18 @@ class InternalNode:
         self.position = None
         self.children = children
         #weight
-        self.CachedValueOfWeight = 0
-        for child in self.children:
-            if(child.CachedValueOfWeight == None):
-                self.CachedValueOfWeight = None
-                break
-            else:
-                self.CachedValueOfWeight += child.CachedValueOfWeight
+        if None in [child.CachedValueOfWeight for child in children]:
+            self.CachedValueOfWeight = None
+        else:
+            self.CachedValueOfWeight = sum([child.CachedValueOfWeight for child in self.children])
         #For each consecutive pair of children check if the intervals match
         # If the node is pure
-        if (False not in  [ left.interval != None \
-                            and right.interval != None \
-                            and left.interval.right == right.interval.left \
-                            for left, right in zip(self.children, self.children[1:])]:
+        if False not in [left.interval != None and right.interval != None and left.interval.right == right.interval.left for left, right in zip(self.children, self.children[1:])]:
             self.interval = Interval(children[0].interval.left,
                                     children[-1].interval.right)
         else: # It's a mixed node
             self.interval = None
+            #TODO calculate weights of consecutive intervals with partialSums
             self.CachedValueOfWeight = sum([child.weight() for child in self.children])
 
     def weight(self):
@@ -167,23 +210,30 @@ class InternalNode:
     Given a code tree, return the (unsorted) list of the depths of its leaves.
     """
     def depths(self, depth=0):
-        depthList = []
+        childrenDepths = []
         for child in self.children:
-            depthList += child.depths(depth+1)
-        return depthList
+            childrenDepths +=child.depths(depth+1)
+        return childrenDepths
 
     """
     Given two code trees, compare them exactly.
     """
     def __cmp__(self,other):
-        return self.partiallySortedArray == other.partiallySortedArray and\
-                self.interval == other.interval and\
-                self.CachedValueOfWeight == other.CachedValueOfWeight and\
-                self.children == other.children
+        return self.partiallySortedArray == other.partiallySortedArray \
+                and self.interval == other.interval \
+                and self.CachedValueOfWeight == other.CachedValueOfWeight \
+                and False not in [a==b for a,b in zip_longest(self.children, other.children)]
     """
     Given two code trees, compare them without restrictions on the order of the children.
     """
     def __eq__(self,other):
-        return self.partiallySortedArray == other.partiallySortedArray and\
-                self.CachedValueOfWeight == other.CachedValueOfWeight and\
-                -1 not in [other.children.find(child) for child in self.children] ## TODO check
+        return self.partiallySortedArray == other.partiallySortedArray \
+                and self.CachedValueOfWeight == other.CachedValueOfWeight \
+                and set(self.children) & set(other.children)
+
+
+if __name__ == '__main__':
+    # main()
+    test = [1,2,3,4,5,5,6,7]
+    test2 = [1,1,2,2,2,4,5]
+    print(GDM(test, 4))
