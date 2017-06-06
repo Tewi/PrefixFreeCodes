@@ -107,6 +107,7 @@ class DaryGDMCodeTree:
         if not self.externals:
             return
         # [EI]*E
+        #TODO find the first r smallest intenral weights with a doubling search
         #We pad the node with the E/I's (costly)
         nodes = []
         #Fill the rest of the node with the next minimun weights

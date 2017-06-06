@@ -4,7 +4,7 @@ import math
 
 
 """
-Implementation of the D-ary Huffman algorithm.
+Implementation of the Huffman algorithm as described by Huffman in his 1952.
 
 This is an heap-based implementation of the method originally described by
 Huffman in 1952.
@@ -12,19 +12,18 @@ Huffman in 1952.
 It receives as input an array of integer frequencies of symbols and size of the
 output alphabet.
 
-It returns an array of the same size containing the associated code lengths
-forming an optimal prefix free code for those frequencies.
+Given a list of weights, return a representation of an optimal prefix free code,
+as a list of codelengths.
 """
 def huffman(weights, D=2):
     N = len(weights)
-    #Casos bordes
+    # Degenerated cases
     if D < 2:
-        raise Exception("Output alphabet must be at least 2 symbols")
+        raise Exception("Output alphabet must have at least 2 symbols")
     if N == 0:
         return []
     if N == 1:
         return [0]
-
     tree = DaryHuffmanCodeTree(weights, D)
     codeLengths = depths(tree.root)
     return codeLengths
