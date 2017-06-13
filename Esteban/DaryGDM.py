@@ -66,7 +66,7 @@ class DaryGDMCodeTree:
             if nbNodes >= leftToFill: #complete the unfinished node
                 self.unfinished.children += self.externals[:leftToFill]
                 self.externals = self.externals[leftToFill:]
-                self.internals.append(self.unfinished)
+                self.internals.append(InternalNode(self.weights, self.unfinished.children))
                 self.unfinished = None
                 nbNodes -= leftToFill
             else: #we fill what we can
@@ -74,7 +74,7 @@ class DaryGDMCodeTree:
                 self.externals = self.externals[nbNodes:]
                 self.internals = self.internals[1:]
                 if len(self.unfinished.children) == self.D:
-                    self.internals.append(InternalNode(self.weights, nodes))
+                    self.internals.append(InternalNode(self.weights, self.unfinished.children))
                     self.unfinished = None
                 nbNodes = 0
 
@@ -114,7 +114,7 @@ class DaryGDMCodeTree:
             if nbNodes >= leftToFill: #complete the unfinished node
                 self.unfinished.children += self.internals[:leftToFill]
                 self.internals = self.internals[leftToFill:]
-                self.internals.append(self.unfinished)
+                self.internals.append(InternalNode(self.weights, self.unfinished.children))
                 self.unfinished = None
                 nbNodes -= leftToFill
             else: #we fill what we can
@@ -145,7 +145,7 @@ class DaryGDMCodeTree:
             if nbNodes >= leftToFill: #complete the unfinished node
                 self.unfinished.children += self.internals[:leftToFill]
                 self.internals = self.internals[leftToFill:]
-                self.internals.append(self.unfinished)
+                self.internals.append(InternalNode(self.weights, self.unfinished.children))
                 self.unfinished = None
                 nbNodes -= leftToFill
             else: #we fill what we can
@@ -153,7 +153,7 @@ class DaryGDMCodeTree:
                 self.internals = self.internals[nbNodes:]
                 self.externals = self.externals[1:]
                 if len(self.unfinished.children) == self.D:
-                    self.internals.append(self.unfinished)
+                    self.internals.append(InternalNode(self.weights, self.unfinished.children))
                     self.unfinished = None
                 nbNodes = 0
 
@@ -275,10 +275,3 @@ class InternalNode:
         return self.partiallySortedArray == other.partiallySortedArray \
                 and self.CachedValueOfWeight == other.CachedValueOfWeight \
                 and set(self.children) & set(other.children)
-
-
-if __name__ == '__main__':
-    # main()
-    test = [1,2,3,4,5,5,6,7]
-    test2 = [1,1,2,2,2,4,5]
-    print(GDM(test, 4))
