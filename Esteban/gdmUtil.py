@@ -1,48 +1,24 @@
 from heapq import *
 import math
+import re
 
 
+def getAlpha(weights, D=2):
+    signature = getEISignature(weights, D)
+    return len(re.findall(r'E+', signature)) #number of E..E blocks in the signature
 
-"""
-Implementation of the Huffman algorithm as described by Huffman in his 1952.
-
-This is an heap-based implementation of the method originally described by
-Huffman in 1952.
-
-It receives as input an array of integer frequencies of symbols and size of the
-output alphabet.
-
-Given a list of weights, return a representation of an optimal prefix free code,
-as a list of codelengths.
-"""
-def huffman(weights, D=2):
+def getEISignature(weights, D=2):
     N = len(weights)
     # Degenerated cases
     if D < 2:
         raise Exception("Output alphabet must have at least 2 symbols")
     if N == 0:
-        return []
+        return ""
     if N == 1:
-        return [0]
-    tree = DaryHuffmanCodeTree(weights, D)
-    codeLengths = depths(tree.root)
-    return codeLengths
+        return "E"
+    return DaryHuffmanCodeTree(weights, D).EI
 
 
-
-"""
-Given a code tree, return the (unsorted) list of the depths of its leaves.
-"""
-def depths(tree, depth=0):
-    if tree == []:
-        return []
-    if len(tree) == 1: # Leaf
-        return [depth]
-    else: # Inner node
-        childrenDepths = []
-        for child in tree[1]:
-            childrenDepths += depths(child, depth+1)
-        return childrenDepths
 
 """
 Given an unsorted list of of at least two weights, return a D-ary code tree
@@ -52,6 +28,9 @@ class DaryHuffmanCodeTree:
     def __init__(self, frequencies, D):
         self.frequencies = frequencies
         self.D = D
+
+        #EI signature
+        self.EI = ""
         # Number of messages
         N = len(frequencies)
         # First we insert the frequencies in the priority queue
@@ -67,6 +46,7 @@ class DaryHuffmanCodeTree:
                 freq = heappop(heap)
                 children.insert(0, freq) #
                 w += freq[0]
+                self.EI += 'E'
             heappush(heap, [w, children]) # reinsert
         # D least probable symbols are taken together
         while len(heap) > 1:
@@ -76,6 +56,31 @@ class DaryHuffmanCodeTree:
                 freq = heappop(heap)
                 children.insert(0, freq)
                 w += freq[0]
+                #Check if the child is external or internal
+                if len(freq) == 2: #Internal
+                    self.EI += 'I'
+                else:
+                    self.EI += 'E'
+
+
             heappush(heap, [w, children])
         #Root has probability 1 (sum of all the frequencies)
+        self.EI += 'I'
         self.root = heappop(heap)
+
+
+if __name__ == '__main__':
+    f = \
+    [ \
+        [1, 2, 3, 4, 5, 5, 6, 7], \
+        [4, 4, 4, 4], \
+        [8, 1, 2, 4], \
+        [1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144, 233, 377, 610, 987, 1597, 2584, 4181, 6765, 10946, 17711, 28657, 46368]
+    ]
+
+    w = f[3]
+    D = 10
+    for w in f:
+        print(w)
+        print(getEISignature(w, D))
+        print(getAlpha(w, D))

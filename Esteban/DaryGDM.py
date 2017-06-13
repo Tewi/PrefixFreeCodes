@@ -25,6 +25,7 @@ minimal redundancy according to the GDM algorithm.
 class DaryGDMCodeTree:
     def __init__(self, weights, D):
 
+        self.unfinished = None
         self.initialize(weights, D)
         while(len(self.externals) > 0):
             self.groupExternals()
@@ -53,39 +54,48 @@ class DaryGDMCodeTree:
     """
     def groupExternals(self):
         # EE...E
-        r = self.weights.rankRight(self.internals[0].weight())
+        if not self.unfinished:
+            r = self.weights.rankRight(self.internals[0].weight())
+        else:
+            r = self.weights.rankRight(self.unfinished.weight())
         nbNodes = r-len(self.weights)+len(self.externals)
-        nbLists = nbNodes//self.D
-        for i in range(0, nbLists):
+
+        #Fill first the unfinished node with E's if there is any
+        if self.unfinished:
+            leftToFill = self.D - len(self.unfinished.children) #
+            if nbNodes >= leftToFill: #complete the unfinished node
+                self.unfinished.children += self.externals[:leftToFill]
+                self.externals = self.externals[leftToFill:]
+                self.internals.append(self.unfinished)
+                self.unfinished = None
+                nbNodes -= leftToFill
+            else: #we fill what we can
+                self.unfinished.children += self.externals[:nbNodes] + self.internals[:1]
+                self.externals = self.externals[nbNodes:]
+                self.internals = self.internals[1:]
+                if len(self.unfinished.children) == self.D:
+                    self.internals.append(InternalNode(self.weights, nodes))
+                    self.unfinished = None
+                nbNodes = 0
+
+
+        # Create internals of E..E's
+        while nbNodes >= self.D:
             self.internals.append(InternalNode(self.weights, self.externals[:self.D]))
             self.externals = self.externals[self.D:]
-        # E..EI[EI]*
-        if nbNodes % self.D > 0:
-            #We pad the node with the E/I's (costly)
-            nodes = self.externals[:nbNodes % self.D] + self.internals[:1]
-            self.externals = self.externals[nbNodes % self.D:]
+            nbNodes -= self.D
+        # If there are unpaired nodes, create an unfinished node with the remaining ones
+        if nbNodes > 0:
+            # The next node must be internal
+            nodes = self.externals[:nbNodes] + self.internals[:1]
+            self.externals = self.externals[nbNodes:]
             self.internals = self.internals[1:]
-            #Fill the rest of the node with the next minimun weights
-            while len(nodes) < self.D:
-                if self.externals and self.internals:
-                    #We have to chose the lighter between E and I
-                    if self.externals[0].weight() <= self.internals[0].weight():
-                        #Next external is lighter
-                        nodes.append(self.externals[0])
-                        self.externals = self.externals[1:]
-                    else:
-                        #Next interal is lighter
-                        nodes.append(self.internals[0])
-                        self.internals = self.internals[1:]
-                elif not self.internals:
-                    #Only E remain
-                    nodes.append(self.externals[0])
-                    self.externals = self.externals[1:]
-                else:
-                    #Only I remain
-                    nodes.append(self.internals[0])
-                    self.internals = self.internals[1:]
-            self.internals.append(InternalNode(self.weights, nodes))
+            #After adding the first internal the node could be complete
+            if len(nodes) == self.D:
+                self.internals.append(InternalNode(self.weights, nodes))
+            else:
+                self.unfinished = InternalNode(self.weights, nodes)
+
 
     """
     Given a partially sorted array of frequencies and the number of frequencies
@@ -96,6 +106,23 @@ class DaryGDMCodeTree:
     """
     #I...I
     def dockInternals(self):
+        nbNodes = len(self.internals)
+        #Fill first the unfinished node with I's if there is any
+        if self.unfinished:
+            leftToFill = self.D - len(self.unfinished.children)
+            nbNodes = len(self.internals)
+            if nbNodes >= leftToFill: #complete the unfinished node
+                self.unfinished.children += self.internals[:leftToFill]
+                self.internals = self.internals[leftToFill:]
+                self.internals.append(self.unfinished)
+                self.unfinished = None
+                nbNodes -= leftToFill
+            else: #we fill what we can
+                self.unfinished.children += self.internals[:nbNodes]
+                self.internals = self.internals[nbNodes:]
+                nbNodes = 0
+
+        # Group remaining internals into other internals
         while self.externals and len(self.internals)>= self.D and self.internals[-1].weight() <= self.externals[0].weight():
             nbPairsToForm = len(self.internals) // self.D
             for i in range(nbPairsToForm):
@@ -106,31 +133,48 @@ class DaryGDMCodeTree:
     def mixInternalWithExternal(self):
         if not self.externals:
             return
-        # [EI]*E
-        #TODO find the first r smallest intenral weights with a doubling search
-        #We pad the node with the E/I's (costly)
-        nodes = []
-        #Fill the rest of the node with the next minimun weights
-        while len(nodes) < self.D:
-            if self.externals and self.internals:
-                #We have to chose the lighter between E and I
-                if self.externals[0].weight() <= self.internals[0].weight():
-                    #Next external is lighter
-                    nodes.append(self.externals[0])
-                    self.externals = self.externals[1:]
-                else:
-                    #Next interal is lighter
-                    nodes.append(self.internals[0])
-                    self.internals = self.internals[1:]
-            elif not self.internals:
-                #Only E remain
-                nodes.append(self.externals[0])
+        # I*E
+        #find the first r smallest intenral weights equal or smaller than the first external
+        #TODO do it with a doubling search
+        nbNodes = 0
+        while nbNodes < len(self.internals) and self.internals[nbNodes].weight() <= self.externals[0].weight() :
+            nbNodes += 1
+        #finish first an unfinished node
+        if self.unfinished:
+            leftToFill = self.D - len(self.unfinished.children)
+            if nbNodes >= leftToFill: #complete the unfinished node
+                self.unfinished.children += self.internals[:leftToFill]
+                self.internals = self.internals[leftToFill:]
+                self.internals.append(self.unfinished)
+                self.unfinished = None
+                nbNodes -= leftToFill
+            else: #we fill what we can
+                self.unfinished.children += self.internals[:nbNodes] + self.externals[:1]
+                self.internals = self.internals[nbNodes:]
                 self.externals = self.externals[1:]
+                if len(self.unfinished.children) == self.D:
+                    self.internals.append(self.unfinished)
+                    self.unfinished = None
+                nbNodes = 0
+
+        # Create internals of I..I's
+        while nbNodes >= self.D:
+            self.internals.append(InternalNode(self.weights, self.internals[:self.D]))
+            self.internals = self.internals[self.D:]
+            nbNodes -= self.D
+
+        # If there are unpaired nodes, create an unfinished node with the remaining ones
+        if nbNodes > 0:
+            # The next node must be external
+            nodes = self.internals[:nbNodes] + self.externals[:1] #IE
+            self.internals = self.internals[nbNodes:]
+            self.externals = self.externals[1:]
+            #After adding the first internal the node could be complete
+            if len(nodes) == self.D:
+                self.internals.append(InternalNode(self.weights, nodes))
             else:
-                #Only I remain
-                nodes.append(self.internals[0])
-                self.internals = self.internals[1:]
-        self.internals.append(InternalNode(self.weights, nodes))
+                self.unfinished = InternalNode(self.weights, nodes)
+
 
 
     """
